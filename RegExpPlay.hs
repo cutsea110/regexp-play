@@ -162,3 +162,51 @@ shiftw m (SYMw f)   c = (symw f) { finalw = m <*> f c }
 shiftw m (ALTw p q) c = altw (shiftw m (regw p) c) (shiftw m (regw q) c)
 shiftw m (SEQw p q) c = seqw (shiftw m (regw p) c) (shiftw (m <*> emptyw p <+> finalw p) (regw q) c)
 shiftw m (REPw r)   c = repw (shiftw (m <+> finalw r) (regw r) c)
+
+submatchw :: Semiring s => REGw (Int,c) s -> [c] -> s
+submatchw r s =
+  matchw (seqw arb (seqw r arb)) (zip [0..] s)
+  where
+    arb = repw (symw (\_ -> one))
+    
+class Semiring s => Semiringi s where
+  index :: Int -> s
+
+symi :: Semiringi s => Char -> REGw (Int,Char) s
+symi c = symw weight
+  where
+    weight (pos,x) | x == c    = index pos
+                   | otherwise = zero
+
+data Leftmost = NoLeft  | Leftmost Start
+              deriving Show
+data Start    = NoStart | Start Int
+              deriving Show
+
+instance Semiring Leftmost where
+  zero = NoLeft
+  one  = Leftmost NoStart
+  NoLeft     <+> x      = x
+  x          <+> NoLeft = x
+  Leftmost x <+> Leftmost y = Leftmost (leftmost x y)
+    where
+      leftmost NoStart   NoStart   = NoStart
+      leftmost NoStart   (Start i) = Start i
+      leftmost (Start i) NoStart   = Start i
+      leftmost (Start i) (Start j) = Start (min i j)
+  NoLeft     <*> _          = NoLeft
+  _          <*> NoLeft     = NoLeft
+  Leftmost x <*> Leftmost y = Leftmost (start x y)
+    where
+      start NoStart s = s
+      start s       _ = s
+
+instance Semiringi Leftmost where
+  index = Leftmost . Start
+
+-- a(a|b)*a
+aaba :: Semiringi s => REGw (Int, Char) s
+aaba = a `seqw` ab `seqw` a
+  where
+    a = symi 'a'    
+    ab = repw (a `altw` symi 'b')    
