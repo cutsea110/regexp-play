@@ -210,3 +210,33 @@ aaba = a `seqw` ab `seqw` a
   where
     a = symi 'a'    
     ab = repw (a `altw` symi 'b')    
+
+
+data LeftLong = NoLeftLong | LeftLong Range
+              deriving Show
+data Range    = NoRange    | Range Int Int
+              deriving Show
+
+instance Semiring LeftLong where
+  zero = NoLeftLong
+  one  = LeftLong NoRange
+  NoLeftLong <+> x = x
+  x          <+> NoLeftLong = x
+  LeftLong x <+> LeftLong y = LeftLong (leftlong x y)
+    where
+      leftlong NoRange     NoRange     = NoRange
+      leftlong NoRange     (Range i j) = Range i j
+      leftlong (Range i j) NoRange     = Range i j
+      leftlong (Range i j) (Range k l)
+        | i < k || i == k && j >= l = Range i j
+        | otherwise                 = Range k l
+  NoLeftLong <*> _ = NoLeftLong
+  _          <*> NoLeftLong = NoLeftLong
+  LeftLong x <*> LeftLong y = LeftLong (range x y)
+    where
+      range NoRange     r           = r
+      range r           NoRange     = r
+      range (Range i _) (Range _ j) = Range i j
+
+instance Semiringi LeftLong where
+  index i = LeftLong (Range i i)
