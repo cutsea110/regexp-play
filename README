@@ -1,0 +1,6 @@
+simple benchmarking code re500 build:
+  ghc --make re500.hs -o re500 -O -prof -rtsopts -auto-all -caf-all -fforce-recomp
+
+bash> time for i in `seq 1 500`; do echo -n a; done | grep -cE "^(a?){500}a{500}$"
+bash> for i in `seq 1 500`; do echo -n a; done | ./re500 +RTS -s
+
