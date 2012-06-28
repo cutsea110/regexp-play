@@ -6,6 +6,7 @@ bash> for i in `seq 1 500`; do echo -n a; done | ./re500 +RTS -s
 
 simple benchmarking code genrnd build:
   ghc --make genrnd.hs -o genrnd -O -prof -rtsopts -auto-all -caf-all -fforce-recomp
+  ghc --make dist20.hs -o dist20 -O -prof -rtsopts -auto-all -caf-all -fforce-recomp
 
-bash> ./genrnd 20 10000
+bash> ./genrnd 20 10000 | ./dist20
 
