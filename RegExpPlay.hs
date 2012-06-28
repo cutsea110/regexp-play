@@ -1,6 +1,6 @@
 module RegExpPlay where
 
-import Prelude hiding (sum)
+import Prelude hiding (sum,seq)
 import Data.List (foldl')
 
 data Reg = Eps         -- ε
@@ -112,7 +112,8 @@ match :: REG -> String -> Bool
 match r [] = empty r
 match r (c:cs) = final (foldl' (shift False) (shift True r c) cs)
 
-data REGw c s = REGw { emptyw :: s
+data REGw c s = REGw { active :: Bool
+                     , emptyw :: s
                      , finalw :: s
                      , regw   :: REw c s
                      }
@@ -123,47 +124,81 @@ data REw c s = EPSw
              | REPw (REGw c s)
 
 epsw :: Semiring s => REGw c s
-epsw = REGw { emptyw = one
+epsw = REGw { active = False
+            , emptyw = one
             , finalw = zero
             , regw   = EPSw
             }
 
 symw :: Semiring s => (c -> s) -> REGw c s
-symw f = REGw { emptyw = zero
+symw f = REGw { active = False
+              , emptyw = zero
               , finalw = zero
               , regw   = SYMw f
               }
 
 altw :: Semiring s => REGw c s -> REGw c s -> REGw c s
-altw p q = REGw { emptyw = emptyw p <+> emptyw q
-                , finalw = finalw p <+> finalw q
+altw p q = REGw { active = active p || active q
+                , emptyw = emptyw p <+> emptyw q
+                , finalw = finala p <+> finala q
                 , regw = ALTw p q
                 }
            
 seqw :: Semiring s => REGw c s -> REGw c s -> REGw c s
-seqw p q = REGw { emptyw = emptyw p <*> emptyw q
-                , finalw = finalw p <*> emptyw q <+> finalw q
+seqw p q = REGw { active = active p || active q
+                , emptyw = emptyw p <*> emptyw q
+                , finalw = finala p <*> emptyw q <+> finala q
                 , regw = SEQw p q
                 }
 
 repw :: Semiring s => REGw c s -> REGw c s
-repw r = REGw { emptyw = one
-              , finalw = finalw r
+repw r = REGw { active = active r
+              , emptyw = one
+              , finalw = finala r
               , regw = REPw r
               }
 
-matchw :: Semiring s => REGw c s -> [c] -> s
+finala :: Semiring s => REGw c s -> s
+finala r = if active r then finalw r else zero
+
+alt :: Semiring s => REGw c s -> REGw c s -> REGw c s
+alt p q = REGw { active = False
+               , emptyw = emptyw p <+> emptyw q
+               , finalw = zero
+               , regw = ALTw p q
+               }
+
+seq :: Semiring s => REGw c s -> REGw c s -> REGw c s
+seq p q = REGw { active = False
+               , emptyw = emptyw p <*> emptyw q
+               , finalw = zero
+               , regw = SEQw p q
+               }
+
+rep :: Semiring s => REGw c s -> REGw c s
+rep r = REGw { active = False
+             , emptyw = one
+             , finalw = zero
+             , regw = REPw r
+             }
+
+matchw :: (Eq s, Semiring s) => REGw c s -> [c] -> s
 matchw r [] = emptyw r
-matchw r (c:cs) = finalw (foldl' (shiftw zero . regw) (shiftw one (regw r) c) cs)
+matchw r (c:cs) = finalw (foldl' (shiftw zero) (shiftw one r c) cs)
 
-shiftw :: Semiring s => s -> REw c s -> c -> REGw c s
-shiftw _ EPSw       _ = epsw
-shiftw m (SYMw f)   c = (symw f) { finalw = m <*> f c }
-shiftw m (ALTw p q) c = altw (shiftw m (regw p) c) (shiftw m (regw q) c)
-shiftw m (SEQw p q) c = seqw (shiftw m (regw p) c) (shiftw (m <*> emptyw p <+> finalw p) (regw q) c)
-shiftw m (REPw r)   c = repw (shiftw (m <+> finalw r) (regw r) c)
+shiftw :: (Eq s, Semiring s) => s -> REGw c s -> c -> REGw c s
+shiftw m r c | active r || m /= zero = stepw m (regw r) c
+             | otherwise = r
 
-submatchw :: Semiring s => REGw (Int,c) s -> [c] -> s
+stepw :: (Eq s, Semiring s) => s -> REw c s -> c -> REGw c s
+stepw _ EPSw       _ = epsw
+stepw m (SYMw f)   c = let fin = m <*> f c
+                       in (symw f) { active = fin /= zero, finalw = fin }
+stepw m (ALTw p q) c = altw (shiftw m p c) (shiftw m q c)
+stepw m (SEQw p q) c = seqw (shiftw m p c) (shiftw (m <*> emptyw p <+> finalw p) q c)
+stepw m (REPw r)   c = repw (shiftw (m <+> finalw r) r c)
+
+submatchw :: (Eq s, Semiring s) => REGw (Int,c) s -> [c] -> s
 submatchw r s =
   matchw (seqw arb (seqw r arb)) (zip [0..] s)
   where
