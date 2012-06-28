@@ -2,26 +2,29 @@ module Main where
 
 import System.Random
 import qualified Data.Map as Map
+import qualified Data.ByteString.Lazy.Char8 as BL
 
-randoms' :: RandomGen g => g -> [Char]
-randoms' g = (\(x,g') -> x:randoms' g') (randomR ('a','b') g)
+randoms' :: RandomGen g => g -> BL.ByteString
+randoms' g = (\(c,g') -> c `BL.cons` randoms' g') (randomR ('a','b') g)
 
-genrnd' :: RandomGen g => g -> Int -> Int -> [Char]
-genrnd' g w len = f streamR 0 Map.empty []
+genrnd' :: RandomGen g => g -> Int -> Int -> BL.ByteString
+genrnd' g w len = f streamR 0 Map.empty BL.empty
   where
     streamR = randoms' g
-    f :: [Char] -> Int -> Map.Map Int a -> [Char] -> [Char]
-    f rrs@(r:rs) n ns ys
-      | n == len  = reverse ys
+    f :: BL.ByteString -> Int -> Map.Map Int a -> BL.ByteString -> BL.ByteString
+    f rrs n ns ys
+      | n == len  = BL.reverse ys
       | otherwise = 
         if Map.member n ns
-        then f rrs (n+1) ns ('b':ys)
-        else f rs (n+1) ns' (r:ys)
+        then f rrs (n+1) ns $ 'b' `BL.cons` ys
+        else f rs (n+1) ns' $ r `BL.cons` ys
             where
+              r = BL.head rrs
+              rs = BL.tail rrs
               ns' = if r=='a' then Map.insert (n+w) undefined ns else ns
 
-genrnd :: RandomGen g => g -> Int -> Int -> [Char]
-genrnd g n l = genrnd' g n ((n+1)*(l+1))
+genrnd :: RandomGen g => g -> Int -> Int -> String
+genrnd g n l = BL.unpack $ genrnd' g n ((n+1)*(l+1))
 
 
 main :: IO ()
