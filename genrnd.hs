@@ -2,27 +2,27 @@ module Main where
 
 import System.Random
 import Data.List
-import Test.QuickCheck
 
-genAB :: IO Char
-genAB = getStdRandom (randomR ('a','b'))
+randoms' :: RandomGen g => g -> [Char]
+randoms' g = (\(x,g') -> x:randoms' g') (randomR ('a','b') g)
 
-genABs :: Int -> Int -> IO [Char]
-genABs w l = g 0 [] []
+genrnd' :: RandomGen g => g -> Int -> Int -> [Char]
+genrnd' g w len = f streamR 0 [] []
   where
-    g :: Int -> [Int] -> [Char] -> IO [Char]
-    g n xs cs | n == l    = return $ reverse cs
-              | otherwise = do
-                case find (n==) xs of
-                  Just _ -> g (n+1) xs ('b':cs)
-                  Nothing -> do
-                    c <- genAB
-                    if c == 'a'
-                      then g (n+1) ((n+w):xs) (c:cs)
-                      else g (n+1) xs (c:cs)
+    streamR = randoms' g
+    f :: [Char] -> Int -> [Int] -> [Char] -> [Char]
+    f rrs@(r:rs) n ns ys
+      | n == len  = reverse ys
+      | otherwise = 
+        case find (n==) ns of
+          Just _  -> f rrs (n+1) ns ('b':ys)
+          Nothing -> f rs (n+1) ns' (r:ys)
+            where
+              ns' = if r=='a' then ((n+w):ns) else ns
 
-genrnd :: Int -> Int -> IO [Char]
-genrnd w n = genABs w ((w+1)*(n+1))
+genrnd :: RandomGen g => g -> Int -> Int -> [Char]
+genrnd g n l = genrnd' g n ((n+1)*(l+1))
+
 
 main :: IO ()
 main = undefined
