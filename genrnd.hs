@@ -1,6 +1,8 @@
 module Main where
 
+import System.Environment
 import System.Random
+import Control.Monad
 import qualified Data.Map as Map
 import qualified Data.ByteString.Lazy.Char8 as BL
 
@@ -28,4 +30,7 @@ genrnd g w l = BL.unpack $ genrnd' g w ((w+1)*(l+1))
 
 
 main :: IO ()
-main = undefined
+main = do
+   w:l:_ <- liftM (map read) getArgs
+   g <- getStdGen
+   putStrLn $ genrnd g w l

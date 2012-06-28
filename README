@@ -4,3 +4,8 @@ simple benchmarking code re500 build:
 bash> time for i in `seq 1 500`; do echo -n a; done | grep -cE "^(a?){500}a{500}$"
 bash> for i in `seq 1 500`; do echo -n a; done | ./re500 +RTS -s
 
+simple benchmarking code genrnd build:
+  ghc --make genrnd.hs -o genrnd -O -prof -rtsopts -auto-all -caf-all -fforce-recomp
+
+bash> ./genrnd 20 10000
+
